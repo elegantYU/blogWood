@@ -71,6 +71,62 @@ render阶段是在内部构建一颗新的fiber树，一般成为workInProgress�
 
 #### 优先级机制
 
+**如何将优先级机制融入 react 运行时**
+
+**1. 获取本次更新优先级**
+
+调用 `requestUpdateLane` 函数获取本次更新任务的优先级
+
+优先级选取判断顺序如下
+```js
+SyncLane  >>  TransitionLane  >>  UpdateLane  >>  EventLane
+```
+
+**2. 创建 Update 对象**
+
+setState 生成 Update 对象，每个对象里有个 lanes 属性
+
+```js
+function createUpdate(eventTime, lane) {
+  var update = {
+    eventTime: eventTime,
+    lane: lane,
+    tag: UpdateState,
+    payload: null,
+    callback: null,
+    next: null
+  };
+  return update;
+}
+```
+
+**3. 关联优先级**
+
+- 将优先级合并到当前 fiber 节点的 lanes 属性中
+- 将优先级合并到父级节点的 childLanes 中 (告诉父节点他的子节点有多少条赛道要跑)
+
+- 将调度任务优先级合并到当前 react 应用根节点上
+- 计算当前任务优先级赛道占用的开始时间
+
+commit 阶段结束之后会释放占用的优先级
+
+**4. 发起调度**
+
+- 高优先级任务打断低优先级任务
+  
+  每一次调度都会对正在进行任务和当前任务最高优先级做比较，如果不相等，就代表有高优先级任务进来，需要打断当前正在的任务。
+
+- 低优先级任务重启
+  
+  协调 (reconcile) 的下一个阶段是渲染 (renderer)，也就是我们说的 commit 阶段，在此阶段末尾，会调用 ensureRootIsScheduled 发起一次新的调度，执行尚未完成的低优先级任务
+
+- 饥饿任务问题
+  
+  高优先级任务执行完毕则重启低优先级任务，如果持续有高优先级任务插入，如何处理？
+
+  每次调度的开始，都会先检查下有没有过期任务，如果有的话，下一次就会以同步优先级进行 render 任务(reconcile)，同步优先级就是最高的优先级，不会被打断
+
+
 交互就会生成更新，不同的更新，优先级不一样。
 react中人为的进行了划分，最终目的是调度轻重缓急，因此产生了一套事件调度的优先级机制。
 - 事件优先级： 按照用户的交互产生的

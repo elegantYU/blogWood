@@ -14,8 +14,34 @@ webpack是一个打包工具，他会把js，css，图片，html文件，分析�
 4. 根据引用节点，引入模块，生成唯一标识的id，并将解析过的模块缓存起来。如果其他地方也引入了模块，则不需要重新解析，生成一个依赖图谱。
 5. 递归遍历所有的模块，根据依赖图谱，生成一个个chunk（包含多个模块）
 6. 将生成的文件输出到output中。
+
+## Tree-shaking 原理
+
+基于 ESM 模块规范，在运行过程中静态分析模块之间的导入导出，确认ESM模块中哪些导出值未被其他模块使用，并将其删除。
+
+- 收集模块导出变量并记录到模块依赖图中
+- 遍历模块图，标记模块导出变量有没有被使用
+- 生成产物时，若变量未被引用则删除其对应的导出语句
+
+[更多细节点击这里](https://juejin.cn/post/7002410645316436004)
+
+## webpack 压缩代码的原理
+
+[点击链接查看](https://q.shanyue.tech/fe/js/138)
+
+
 ## 热更新的原理
-对代码进行修改的时候，webpack会对代码进行重新打包，将新的模块发到浏览器上，浏览器将新的模块替换老的模块，在不触发更新的情况下。
+
+> 先介绍功能点
+
+webpack-dev-server 主要包含了三个部分：
+1. webpack: 负责编译代码
+2. webpack-dev-middleware: 主要负责构建内存文件系统，把webpack的 OutputFileSystem 替换成 InMemoryFileSystem。同时作为Express的中间件拦截请求，从内存文件系统中把结果拿出来。
+3. express：负责搭建请求路由服务。
+
+> 介绍工作流程
+
+对代码进行修改的时候，webpack会对代码进行重新打包;通过 webpack 创建的 complier 实例， 可以往`compiler.hooks.done`(webpack 编辑完成的钩子)注册事件;当监听到一次 webpack 编译结束，会通过 websocket 向客户端发送 hash 和ok 事件;客户端接收服务端的推送信息后，对比当前 modules tree ，再次发请求到 Server 端获取新的JS模块;获取到新的JS模块后，会更新 modules tree并替换掉现有的模块;最后调用 module.hot.accept() 完成热更新.
 
 <%note primary%> 
 热更新在webpack里主要是根据websocket，建立双方的通信。当代码发生变化时，通知浏览器请求新的模块，替换原来的。
